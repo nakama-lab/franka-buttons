@@ -2,6 +2,8 @@
 
 This is a ROS repo to read the state of the buttons of franka robot.
 
+**TODO: Move this to the top-level fodler in the repository and update the install instructions to match the correct filepaths**
+
 ## Installation
 
 **TODO: list extra dependencies (requests and specific websocket version)**
