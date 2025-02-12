@@ -1,13 +1,13 @@
 from setuptools import find_packages, setup
 
-package_name = "franka_buttons_ros2"
+package_name = "franka_buttons"
 
 setup(
     name=package_name,
     version="0.0.0",
     maintainer="Jelle Hierck",
     maintainer_email="j.j.hierck@student.utwente.nl",
-    description="Read the franka buttons and publish it in ROS 2",
+    description="ROS 2 driver for Franka Pilot buttons",
     license="MIT",
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -29,7 +29,7 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "franka_pilot_buttons = franka_buttons_ros2.franka_pilot_buttons:main",
+            "franka_pilot_buttons = franka_buttons.franka_pilot_buttons:main",
         ],
     },
     zip_safe=True,

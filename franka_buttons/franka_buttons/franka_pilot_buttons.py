@@ -27,7 +27,7 @@ from std_msgs.msg import Bool, Float32
 from websocket import WebSocket, create_connection
 
 # TODO: Make this a parameter? Or only the .env file in ButtonDesk?
-CREDENTIALS_DIRECTORY = pathlib.Path("~/.ros2/franka_buttons_ros2/credentials").expanduser()
+CREDENTIALS_DIRECTORY = pathlib.Path("~/.ros2/franka_buttons/credentials").expanduser()
 """Path to the directory where credentials and tokens used for Franka Desk authentication are stored."""
 
 TOKEN_PATH = CREDENTIALS_DIRECTORY / "token.conf"

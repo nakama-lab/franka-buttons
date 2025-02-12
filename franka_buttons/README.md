@@ -41,7 +41,7 @@ If you do not want to pollute the global installation of Python (which is recomm
 
    # OR from a requirements.txt file
    # TODO: Perhaps there is a way to get all requirements.txt files from files inside the src/ folder?
-   python3 -m pip install -r src/franka_buttons_ros2/requirements.txt
+   python3 -m pip install -r src/franka_buttons_ros2/franka_buttons/requirements.txt
 
    # OR directly
    python3 -m pip install package1 package2
@@ -51,7 +51,7 @@ If you do not want to pollute the global installation of Python (which is recomm
 
    ```bash
    source .venv/bin/activate
-   python -m colcon build --symlink-install --packages-up-to franka_buttons_ros2
+   python -m colcon build --symlink-install --packages-up-to franka_buttons
    ```
 
 6. Source the built files and run the nodes. **Order matters! Source the built workspace first, and then the virtual environment.** (you can repeat this step whenever you want to run or launch):
@@ -76,14 +76,14 @@ To connect to the pilot buttons, we need to connect to the Franka Desk using a u
 1. Copy the `.env` template to the `.ros` working directory:
 
    ```bash
-   cd ~/your_workspace/src/franka_buttons_ros2  # <-- Change to the location of this package
-   mkdir -p ~/.ros/franka_buttons_ros2/credentials
-   cp -i .env.template ~/.ros/franka_buttons_ros2/credentials/.env
+   cd ~/your_workspace/src/franka_buttons_ros2/franka_buttons  # <-- Change to the location of this package
+   mkdir -p ~/.ros/franka_buttons/credentials
+   cp -i .env.template ~/.ros/franka_buttons/credentials/.env
 
 2. Add your credentials to the copied file:
 
    ```bash
-   nano ~/.ros/franka_buttons_ros2/credentials/.env
+   nano ~/.ros/franka_buttons/credentials/.env
    ```
 
 The client credentials for Franka Desk need to be stored in a specific location
