@@ -8,7 +8,6 @@ TODO: Add more description and proper credits
 
 import asyncio
 import base64
-import dataclasses
 import hashlib
 import json
 import os
@@ -23,8 +22,9 @@ from dotenv import load_dotenv
 from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 from requests.packages import urllib3
-from std_msgs.msg import Bool, Float32
 from websocket import WebSocket, create_connection
+
+from franka_buttons_interfaces.msg import FrankaPilotButtonEvent
 
 # TODO: Make this a parameter? Or only the .env file in ButtonDesk?
 CREDENTIALS_DIRECTORY = pathlib.Path("~/.ros2/franka_buttons/credentials").expanduser()
@@ -154,11 +154,7 @@ class FrankaPilotButtonsNode(Node):
         self.get_logger().info("Franka Desk login succesful.")
 
         # TODO: Replace with custom ROS message
-        self.button_x_publisher = self.create_publisher("franka_buttons/x", Float32, queue_size=10)
-        # self.button_y_publisher = rospy.Publisher("franka_buttons/y", Float32, queue_size=10)
-        # self.button_circle_publisher = rospy.Publisher("franka_buttons/circle", Bool, queue_size=10)
-        # self.button_cross_publisher = rospy.Publisher("franka_buttons/cross", Bool, queue_size=10)
-        # self.button_check_publisher = rospy.Publisher("franka_buttons/check", Bool, queue_size=10)
+        self.button_event_publisher = self.create_publisher("franka_pilot_button_event", FrankaPilotButtonEvent, 10)
 
     async def start_spin(self) -> None:
         """Start spinning the node.
@@ -189,51 +185,37 @@ class FrankaPilotButtonsNode(Node):
                 pass
 
     def handle_pilot_button(self, event: PilotButtonEvent) -> None:
-        """Handle a pilot button event.
+        """Handle a pilot button event and publish to the corresponding topic.
 
         All the Pilot buttons except for the `Pilot Mode` button can be captured. Make sure Pilot Mode is set to Desk
         instead of End-Effector to receive direction key events. You can change the Pilot mode by pressing the `Pilot
         Mode` button or changing the mode in the Desk. Events will be triggered while buttons are pressed down or
         released.
 
-        :param event: contains the triggered buttons as keys. The values of those keys will depend on the kind of event,
-            either True for a button pressed down or False when released. The possible buttons are: `circle`, `cross`,
-            `check`, `left`, `right`, `down`, and `up`.
-        :param event: _description_
+        :param event: Dictionary containing the pressed state of each button. The keys are the button names (`circle`,
+            `cross`, `check`, `left`, `right`, `down`, and `up`) and the value is a boolean indcating pressed (`True`)
+            or released (`False`).
         """
         self.get_logger().info(f"Received {event=}")
-        feedback_x = 0
-        feedback_y = 0
-        feedback_circle = False
-        feedback_cross = False
-        feedback_check = False
+        button_event_msg = FrankaPilotButtonEvent()
 
         for button, pressed in event.items():
-            if button == "down" and pressed is True:
-                feedback_x = 1
-            elif button == "up" and pressed is True:
-                feedback_x = -1
-            elif button == "right" and pressed is True:
-                feedback_y = 1
-            elif button == "left" and pressed is True:
-                feedback_y = -1
-            elif button == "circle" and pressed is True:
-                feedback_circle = True
-            elif button == "cross" and pressed is True:
-                feedback_cross = True
-            elif button == "check" and pressed is True:
-                feedback_check = True
+            if button == "down":
+                button_event_msg.down = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
+            elif button == "up":
+                button_event_msg.up = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
+            elif button == "right":
+                button_event_msg.right = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
+            elif button == "left":
+                button_event_msg.left = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
+            elif button == "circle":
+                button_event_msg.circle = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
+            elif button == "cross":
+                button_event_msg.cross = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
+            elif button == "check":
+                button_event_msg.check = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
 
-        msg_x = Float32(data=feedback_x)
-        msg_y = Float32(data=feedback_y)
-        msg_circle = Bool(data=feedback_circle)
-        msg_cross = Bool(data=feedback_cross)
-        msg_check = Bool(data=feedback_check)
-        self.button_x_publisher.publish(msg_x)
-        self.button_y_publisher.publish(msg_y)
-        self.button_circle_publisher.publish(msg_circle)
-        self.button_cross_publisher.publish(msg_cross)
-        self.button_check_publisher.publish(msg_check)
+        self.button_event_publisher.publish(button_event_msg)
 
 
 def main(args: list[str] | None = None) -> None:

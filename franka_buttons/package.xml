@@ -13,10 +13,10 @@
 
   <!-- Third-party ROS dependencies -->
 
+  <!-- Other ROS dependencies from this project -->
+  <depend>franka_buttons_interfaces</depend>
+
   <!-- Pure python dependencies -->
-  <!-- TODO: Currently installs the wrong version of websockets, use virtual environment instead (see README) -->
-  <exec_depend>python3-websockets</exec_depend>
-  <exec_depend>python3-requests</exec_depend>
 
   <!-- Test dependencies -->
   <test_depend>ament_copyright</test_depend>
