@@ -107,14 +107,19 @@ class Desk:
             headers=headers,
             files=files,
         )
-        if response.status_code != 200:
+        if response.status_code == requests.codes.forbidden:
+            msg = f"Login credentials are incorrect. Response: {response.text}"
+            raise ConnectionError(msg)
+        if response.status_code != requests.codes.ok:
             raise ConnectionError(response.text)
+
         return response
 
     def create_websocket_connection(self) -> WebSocket:
         """Create a websocket connection to the Franka Desk for pilot button events (navigation events)."""
         if not self.is_logged_in():
-            raise Exception("Not logged in")  # TODO: Replace with better error
+            msg = "Cannot connect to websocket: not logged in. Please log in first."
+            raise ConnectionError(msg)
 
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
         ctx.check_hostname = False
@@ -144,17 +149,12 @@ class FrankaPilotButtonsNode(Node):
         )
 
         # TODO: Add parameter for where to find the login credentials
-        load_dotenv(CREDENTIALS_DIRECTORY / ".env")  # TODO: Make this a parameter?
 
-        # Set up connection to the Franka Desk and attempt to log in.
-        self.desk = Desk(hostname_param.get_parameter_value().string_value)
-        username = os.getenv("FRANKA_DESK_USERNAME")
-        password = os.getenv("FRANKA_DESK_PASSWORD")
-        self.desk.login(username, password)
-        self.get_logger().info("Franka Desk login succesful.")
-
-        # TODO: Replace with custom ROS message
+        # Create publishers
         self.button_event_publisher = self.create_publisher("franka_pilot_button_event", FrankaPilotButtonEvent, 10)
+
+        # Set up the Franka Desk.
+        self.desk = Desk(hostname_param.get_parameter_value().string_value)
 
     async def start_spin(self) -> None:
         """Start spinning the node.
@@ -164,8 +164,18 @@ class FrankaPilotButtonsNode(Node):
         """
         timeout = 1.0  # TODO: Make configurable
 
+        # Connect to the desk and log in
+        self.get_logger().info("Logging in to Franka Desk.")
+        load_dotenv(CREDENTIALS_DIRECTORY / ".env")  # TODO: Make this a parameter?
+        username = os.getenv("FRANKA_DESK_USERNAME")
+        password = os.getenv("FRANKA_DESK_PASSWORD")
+        self.desk.login(username, password)
+        self.get_logger().info("Franka Desk login succesful.")
+        # TODO: Maybe we need to take control here?
+
         # Obtain the websocket connection
         ws_connection = self.desk.create_websocket_connection()
+        self.get_logger().info("Websocket to Desk opened.")
 
         # Create an asynchronous receive function to obtain the next message from the websocket
         async def websocket_recv(timeout: float | None = None) -> str | bytes:
