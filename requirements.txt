@@ -1,0 +1,3 @@
+websockets>=14
+requests>=2
+python-dotenv

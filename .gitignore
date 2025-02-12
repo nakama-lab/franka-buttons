@@ -1,1 +1,7 @@
 __pycache__
+
+# Secrets are stored in .env files
+.env*
+
+# Specifically allow the .env file template
+!.env.template

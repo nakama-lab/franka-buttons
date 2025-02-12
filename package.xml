@@ -7,6 +7,18 @@
   <maintainer email="j.j.hierck@student.utwente.nl">Jelle Hierck</maintainer>
   <license>MIT</license>
 
+  <!-- ROS built-in dependencies -->
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+
+  <!-- Third-party ROS dependencies -->
+
+  <!-- Pure python dependencies -->
+  <!-- TODO: Currently installs the wrong version of websockets, use virtual environment instead (see README) -->
+  <exec_depend>python3-websockets</exec_depend>
+  <exec_depend>python3-requests</exec_depend>
+
+  <!-- Test dependencies -->
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>

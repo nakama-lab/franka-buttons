@@ -28,7 +28,9 @@ setup(
     ],
     tests_require=["pytest"],
     entry_points={
-        "console_scripts": [],
+        "console_scripts": [
+            "franka_pilot_buttons = franka_buttons_ros2.franka_pilot_buttons:main",
+        ],
     },
     zip_safe=True,
 )
