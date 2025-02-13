@@ -208,6 +208,7 @@ class FrankaPilotButtonsNode(Node):
         """
         self.get_logger().info(f"Received {event=}")
         button_event_msg = FrankaPilotButtonEvent()
+        button_event_msg.header.stamp = self.get_clock().now()
 
         for button, pressed in event.items():
             if button == "down":
