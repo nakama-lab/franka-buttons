@@ -17,12 +17,14 @@ import ssl
 import typing
 from urllib import parse
 
+import urllib3
+
 import rclpy
 import requests
 from dotenv import load_dotenv
 from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
-from websocket import WebSocket, create_connection
+from websockets.asyncio.client import connect
 
 from franka_buttons_interfaces.msg import FrankaPilotButtonEvent
 
@@ -44,7 +46,7 @@ class Desk:
     """
 
     @staticmethod
-    def encode_password(username: str, password: str) -> bytes:
+    def encode_password(username: str, password: str) -> str:
         """Encode the password into the form needed to log into the Desk interface."""
         bytes_str = ",".join([str(b) for b in hashlib.sha256((f"{password}#{username}@franka").encode()).digest()])
         return base64.encodebytes(bytes_str.encode("utf-8")).decode("utf-8")
@@ -59,11 +61,12 @@ class Desk:
         # Set up a Session to store the authorization headers
         self._session = requests.Session()
         self._session.verify = False  # Do not verify the SSL certificate
+        urllib3.disable_warnings()  # Ignore the error about SSL certificate verification
 
     @property
     def is_logged_in(self) -> bool:
         """Check if this user is logged in."""
-        return self._session.cookies.get("authorization", default=None) is not None
+        return "authorization" in self._session.cookies
 
     def login(self, username: str, password: str, timeout: float | None = None) -> None:
         """Log into the Desk.
@@ -97,7 +100,7 @@ class Desk:
             json=json,
             timeout=timeout,
         )
-        if response.status_code == requests.codes.forbidden:
+        if response.status_code == requests.codes.unauthorized:
             msg = f"Login credentials are incorrect. Response: {response.text}"
             raise ConnectionError(msg)
         if response.status_code != requests.codes.ok:
@@ -105,20 +108,20 @@ class Desk:
 
         return response
 
-    def create_websocket_connection(self, timeout: float | None = None) -> WebSocket:
+    def create_websocket_connection(self, timeout: float | None = None) -> connect:
         """Create a websocket connection to the Franka Desk for pilot button events (navigation events)."""
-        if not self.is_logged_in():
+        if not self.is_logged_in:
             msg = "Cannot connect to websocket: not logged in. Please log in first."
             raise ConnectionError(msg)
 
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        return create_connection(
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        return connect(
             f"wss://{self.hostname}/desk/api/navigation/events",
-            ssl_context=ctx,
-            additional_headers={"authorization": self._session.cookies.get("authorization")},
-            timeout=timeout,
+            ssl=ssl_context,
+            additional_headers={"authorization": self._session.cookies["authorization"]},
+            open_timeout=timeout,
         )
 
 
@@ -178,8 +181,8 @@ class FrankaPilotButtonsNode(Node):
 
         self.get_logger().info(f"Logging in to Franka Desk using credentials in '{credentials_filepath}'.")
         self.desk.login(
-            username=os.getenv("FRANKA_DESK_USERNAME"),
-            password=os.getenv("FRANKA_DESK_PASSWORD"),
+            username=os.environ["FRANKA_DESK_USERNAME"],
+            password=os.environ["FRANKA_DESK_PASSWORD"],
             timeout=self.get_parameter("request_timeout").get_parameter_value().double_value,
         )
         self.get_logger().info("Franka Desk login succesful.")
@@ -191,9 +194,10 @@ class FrankaPilotButtonsNode(Node):
         )
         self.get_logger().info("Websocket to Desk opened.")
 
-        while rclpy.ok():
-            event: PilotButtonEvent = json.loads(await ws_connection.recv())
-            self.handle_pilot_button(event)
+        async with ws_connection as websocket:
+            while rclpy.ok():
+                event: PilotButtonEvent = json.loads(await websocket.recv())
+                self.handle_pilot_button(event)
 
     def handle_pilot_button(self, event: PilotButtonEvent) -> None:
         """Handle a pilot button event and publish to the corresponding topic.
