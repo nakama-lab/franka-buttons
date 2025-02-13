@@ -21,7 +21,6 @@ import rclpy
 import requests
 from dotenv import load_dotenv
 from rcl_interfaces.msg import ParameterDescriptor
-from rclpy.executors import Executor, SingleThreadedExecutor
 from rclpy.node import Node
 from websocket import WebSocket, create_connection
 
@@ -57,8 +56,7 @@ class Desk:
         """
         self.hostname = hostname
 
-        # Set up connection to the Franka Desk and attempt to log in.
-        # urllib3.disable_warnings()
+        # Set up a Session to store the authorization headers
         self._session = requests.Session()
         self._session.verify = False  # Do not verify the SSL certificate
 
@@ -67,7 +65,7 @@ class Desk:
         """Check if this user is logged in."""
         return self._session.cookies.get("authorization", default=None) is not None
 
-    def login(self, username: str, password: str) -> None:
+    def login(self, username: str, password: str, timeout: float | None = None) -> None:
         """Log into the Desk.
 
         :param username: Username of the Desk account.
@@ -79,6 +77,7 @@ class Desk:
             "post",
             "/admin/api/login",
             json={"login": username, "password": self.encode_password(username, password)},
+            timeout=timeout,
         )
 
         # Store the authorization cookie for subsequent requests
@@ -89,16 +88,14 @@ class Desk:
         method: typing.Literal["post", "get", "delete"],
         url: str,
         json: dict[str, str] | None = None,
-        headers: dict[str, str] | None = None,
-        files: dict[str, str] | None = None,
+        timeout: float | None = None,
     ) -> requests.Response:
         """Make a request to the Desk."""
         request_func = getattr(self._session, method)
         response: requests.Response = request_func(
             parse.urljoin(f"https://{self.hostname}", url),
             json=json,
-            headers=headers,
-            files=files,
+            timeout=timeout,
         )
         if response.status_code == requests.codes.forbidden:
             msg = f"Login credentials are incorrect. Response: {response.text}"
@@ -108,7 +105,7 @@ class Desk:
 
         return response
 
-    def create_websocket_connection(self) -> WebSocket:
+    def create_websocket_connection(self, timeout: float | None = None) -> WebSocket:
         """Create a websocket connection to the Franka Desk for pilot button events (navigation events)."""
         if not self.is_logged_in():
             msg = "Cannot connect to websocket: not logged in. Please log in first."
@@ -121,6 +118,7 @@ class Desk:
             f"wss://{self.hostname}/desk/api/navigation/events",
             ssl_context=ctx,
             additional_headers={"authorization": self._session.cookies.get("authorization")},
+            timeout=timeout,
         )
 
 
@@ -136,18 +134,15 @@ class FrankaPilotButtonsNode(Node):
             "hostname",
             "",
             ParameterDescriptor(
-                description="Franka Desk hostname",
+                description="[REQUIRED] Franka Desk hostname",
                 read_only=True,  # Hostname cannot be changed after the node is initialized
             ),
         )
         # Validate that the parameter was set
-        hostname = hostname_param.get_parameter_value().string_value
-        if hostname == "":
+        if hostname_param.get_parameter_value().string_value == "":
             self.get_logger().error("The 'hostname' parameter is required but was not provided!")
             msg = "Missing required parameter: 'hostname'"
             raise RuntimeError(msg)
-
-        self.get_logger().info(f"Using hostname: {hostname}")
 
         self.declare_parameter(
             "credentials_filepath",
@@ -155,6 +150,14 @@ class FrankaPilotButtonsNode(Node):
             ParameterDescriptor(
                 description="Filepath to the credentials environment file.",
                 read_only=True,  # Credentials path cannot be changed after the node is initialized
+            ),
+        )
+
+        self.declare_parameter(
+            "request_timeout",
+            2.0,
+            ParameterDescriptor(
+                description="Timeout in seconds for requests to the Franka Desk.",
             ),
         )
 
@@ -171,16 +174,21 @@ class FrankaPilotButtonsNode(Node):
         """
         # Connect to the desk and log in
         credentials_filepath = self.get_parameter("credentials_filepath").get_parameter_value().string_value
-        self.get_logger().info(f"Logging in to Franka Desk using credentials in '{credentials_filepath}'.")
         load_dotenv(credentials_filepath)
-        username = os.getenv("FRANKA_DESK_USERNAME")
-        password = os.getenv("FRANKA_DESK_PASSWORD")
-        self.desk.login(username, password)
+
+        self.get_logger().info(f"Logging in to Franka Desk using credentials in '{credentials_filepath}'.")
+        self.desk.login(
+            username=os.getenv("FRANKA_DESK_USERNAME"),
+            password=os.getenv("FRANKA_DESK_PASSWORD"),
+            timeout=self.get_parameter("request_timeout").get_parameter_value().double_value,
+        )
         self.get_logger().info("Franka Desk login succesful.")
         # TODO: Maybe we need to take control here?
 
         # Obtain the websocket connection
-        ws_connection = self.desk.create_websocket_connection()
+        ws_connection = self.desk.create_websocket_connection(
+            timeout=self.get_parameter("request_timeout").get_parameter_value().double_value,
+        )
         self.get_logger().info("Websocket to Desk opened.")
 
         while rclpy.ok():
