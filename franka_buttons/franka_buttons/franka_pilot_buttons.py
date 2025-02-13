@@ -1,9 +1,6 @@
-"""Code originally inspiered by https://github.com/JeanElsner/panda-py/blob/main/src/panda_py/__init__.py and
-https://github.com/franzesegiovanni/franka_buttons/blob/main/scripts/buttons_listener.py.
+"""Franka Pilot Buttons node.
 
-All the credits to the authors.
-
-TODO: Add more description and proper credits
+This node will read the Pilot Buttons state from the Franka Desk and publish to ROS 2 topic.
 """
 
 import asyncio
