@@ -17,10 +17,9 @@ import ssl
 import typing
 from urllib import parse
 
-import urllib3
-
 import rclpy
 import requests
+import urllib3
 from dotenv import load_dotenv
 from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
@@ -229,6 +228,8 @@ class FrankaPilotButtonsNode(Node):
                 button_event_msg.cross = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
             elif button == "check":
                 button_event_msg.check = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
+            else:
+                self.get_logger().warn(f"Unhandled button event {event=}")
 
         self.button_event_publisher.publish(button_event_msg)
 
