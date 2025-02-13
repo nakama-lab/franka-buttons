@@ -73,8 +73,6 @@ class Desk:
         :param username: Username of the Desk account.
         :param password: Plain password of the Desk account. It will be encoded before beint sent to the Desk.
         """
-        # TODO: Add better error handling for incorrect username / password, e.g. with a custom exception
-        # TODO: Add error to docstring
         response = self._request(
             "post",
             "/admin/api/login",
@@ -185,7 +183,6 @@ class FrankaPilotButtonsNode(Node):
             timeout=self.get_parameter("request_timeout").get_parameter_value().double_value,
         )
         self.get_logger().info("Franka Desk login succesful.")
-        # TODO: Maybe we need to take control here?
 
         # Obtain the websocket connection
         ws_connection = self.desk.create_websocket_connection(
@@ -195,6 +192,8 @@ class FrankaPilotButtonsNode(Node):
 
         async with ws_connection as websocket:
             while rclpy.ok():
+                # TODO: Possibly handle websockets.exceptions.ConnectionClosedOK here?
+                # See https://github.com/jellehierck/franka_buttons_ros2/issues/1
                 event: PilotButtonEvent = json.loads(await websocket.recv())
                 self.handle_pilot_button(event)
 
