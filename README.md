@@ -2,19 +2,20 @@
 
 This is a ROS repo to read the state of the buttons of franka robot.
 
-- [Installation](#installation)
-  - [Preparing the virtual environment](#preparing-the-virtual-environment)
-  - [Install Python dependencies](#install-python-dependencies)
-  - [Build the workspace](#build-the-workspace)
-- [Configuring Franka Desk credentials](#configuring-franka-desk-credentials)
-- [Running the node](#running-the-node)
-  - [Franka Desk access](#franka-desk-access)
-  - [Node configuration](#node-configuration)
-  - [Button events](#button-events)
-- [A note about versions](#a-note-about-versions)
-- [Acknowledgments](#acknowledgments)
-- [Maintainer](#maintainer)
-- [License](#license)
+- [Read franka buttons in ROS](#read-franka-buttons-in-ros)
+  - [Installation](#installation)
+    - [Preparing the virtual environment](#preparing-the-virtual-environment)
+    - [Install Python dependencies](#install-python-dependencies)
+    - [Build the workspace](#build-the-workspace)
+  - [Configuring Franka Desk credentials](#configuring-franka-desk-credentials)
+  - [Running the node](#running-the-node)
+    - [Franka Desk access](#franka-desk-access)
+    - [Node configuration](#node-configuration)
+    - [Button events](#button-events)
+  - [A note about versions](#a-note-about-versions)
+  - [Acknowledgments](#acknowledgments)
+  - [Maintainer](#maintainer)
+  - [License](#license)
 
 ## Installation
 
@@ -101,7 +102,7 @@ cd ~/<your_ws>
 source install/setup.bash
 source .venv/bin/activate
 
-ros2 run franka_buttons franka_pilot_buttons --ros-args -p hostname=<robot-ip>
+ros2 run franka_buttons franka_pilot_buttons --ros-args -p hostname:=<robot-ip>
 ```
 
 You can also include this node into a launch file with the following snippet:
@@ -134,7 +135,11 @@ def generate_launch_description() -> LaunchDescription:
 
 ### Franka Desk access
 
-**TODO: Add a section about franka desk access with screenshots**
+Once the `franka_pilot_buttons` node logs in to the Desk, it will automatically take control of the robot and cause the Desk dashboard in the browser to disconnect as shown below.
+
+Note: When the browser dashboard reconnects to the robot (e.g. by pressing the `Reconnect` button or refreshing the page), the `franka_pilot_buttons` node will shut down.
+
+![Franka Desk dashboard disconnect](./doc/franka-desk-disconnect.png)
 
 ### Node configuration
 
