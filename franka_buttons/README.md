@@ -29,7 +29,7 @@ If you do not want to pollute the global installation of Python (which is recomm
    touch .venv/COLCON_IGNORE
    ```
 
-3. Add the following snippet to `setup.cfg` of all packages that will use dependencies installed in the virtual environment:
+3. Add the following snippet to `setup.cfg` of all packages that will use dependencies installed in the virtual environment (this is already done for this package):
 
    ```text
    [build_scripts]
@@ -78,9 +78,8 @@ To connect to the pilot buttons, we need to connect to the Franka Desk using a u
 1. Copy the `.env` template to the `.ros` working directory:
 
    ```bash
-   cd ~/your_workspace/src/franka_buttons_ros2/franka_buttons  # <-- Change to the location of this package
    mkdir -p ~/.ros/franka_buttons/credentials
-   cp -i .env.template ~/.ros/franka_buttons/credentials/.env
+   cp -i ~/<your_workspace>/src/franka_buttons_ros2/franka_buttons/.env.template ~/.ros/franka_buttons/credentials/.env
 
 2. Add your credentials to the copied file:
 
