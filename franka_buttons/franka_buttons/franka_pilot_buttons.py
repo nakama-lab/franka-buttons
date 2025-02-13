@@ -8,6 +8,7 @@ TODO: Add more description and proper credits
 
 import asyncio
 import base64
+import contextlib
 import hashlib
 import json
 import os
@@ -20,22 +21,14 @@ import rclpy
 import requests
 from dotenv import load_dotenv
 from rcl_interfaces.msg import ParameterDescriptor
+from rclpy.executors import Executor, SingleThreadedExecutor
 from rclpy.node import Node
-from requests.packages import urllib3
 from websocket import WebSocket, create_connection
 
 from franka_buttons_interfaces.msg import FrankaPilotButtonEvent
 
-# TODO: Make this a parameter? Or only the .env file in ButtonDesk?
-CREDENTIALS_DIRECTORY = pathlib.Path("~/.ros2/franka_buttons/credentials").expanduser()
+DEFAULT_CREDENTIALS_DIRECTORY = pathlib.Path("~/.ros/franka_buttons/credentials").expanduser()
 """Path to the directory where credentials and tokens used for Franka Desk authentication are stored."""
-
-TOKEN_PATH = CREDENTIALS_DIRECTORY / "token.conf"
-"""Path to the configuration file holding known control tokens.
-
-If :py:class:`Desk` is used to connect to a control unit's web interface and takes control, the generated token is
-stored in this file under the unit's IP address or hostname.
-"""
 
 
 PilotButtonEvent = dict[str, bool]
@@ -57,7 +50,7 @@ class Desk:
         bytes_str = ",".join([str(b) for b in hashlib.sha256((f"{password}#{username}@franka").encode()).digest()])
         return base64.encodebytes(bytes_str.encode("utf-8")).decode("utf-8")
 
-    def __init__(self, hostname: str):
+    def __init__(self, hostname: str) -> None:
         """Initialize a headless Desk instance to connecto to the Franka Desk.
 
         :param hostname: Hostname of the Desk
@@ -147,26 +140,39 @@ class FrankaPilotButtonsNode(Node):
                 read_only=True,  # Hostname cannot be changed after the node is initialized
             ),
         )
+        # Validate that the parameter was set
+        hostname = hostname_param.get_parameter_value().string_value
+        if hostname == "":
+            self.get_logger().error("The 'hostname' parameter is required but was not provided!")
+            msg = "Missing required parameter: 'hostname'"
+            raise RuntimeError(msg)
 
-        # TODO: Add parameter for where to find the login credentials
+        self.get_logger().info(f"Using hostname: {hostname}")
+
+        self.declare_parameter(
+            "credentials_filepath",
+            str(DEFAULT_CREDENTIALS_DIRECTORY / ".env"),
+            ParameterDescriptor(
+                description="Filepath to the credentials environment file.",
+                read_only=True,  # Credentials path cannot be changed after the node is initialized
+            ),
+        )
 
         # Create publishers
-        self.button_event_publisher = self.create_publisher("franka_pilot_button_event", FrankaPilotButtonEvent, 10)
+        self.button_event_publisher = self.create_publisher(FrankaPilotButtonEvent, "franka_pilot_button_event", 10)
 
         # Set up the Franka Desk.
         self.desk = Desk(hostname_param.get_parameter_value().string_value)
 
-    async def start_spin(self) -> None:
-        """Start spinning the node.
+    async def start_desk_loop(self) -> None:
+        """Start the loop which obtains messages from the Desk websocket and publishes to ROS 2.
 
-        This function handles ROS 2 callbacks and websocket events asynchronously, and should therefore be called with
-        the proper `asyncio` action.
+        This function will loop forever, so it is designed to run with `asyncio` alongside a `rclpy.spin*()` variant.
         """
-        timeout = 1.0  # TODO: Make configurable
-
         # Connect to the desk and log in
-        self.get_logger().info("Logging in to Franka Desk.")
-        load_dotenv(CREDENTIALS_DIRECTORY / ".env")  # TODO: Make this a parameter?
+        credentials_filepath = self.get_parameter("credentials_filepath").get_parameter_value().string_value
+        self.get_logger().info(f"Logging in to Franka Desk using credentials in '{credentials_filepath}'.")
+        load_dotenv(credentials_filepath)
         username = os.getenv("FRANKA_DESK_USERNAME")
         password = os.getenv("FRANKA_DESK_PASSWORD")
         self.desk.login(username, password)
@@ -177,22 +183,9 @@ class FrankaPilotButtonsNode(Node):
         ws_connection = self.desk.create_websocket_connection()
         self.get_logger().info("Websocket to Desk opened.")
 
-        # Create an asynchronous receive function to obtain the next message from the websocket
-        async def websocket_recv(timeout: float | None = None) -> str | bytes:
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(None, ws_connection.recv, timeout)
-
         while rclpy.ok():
-            # Check if there are any ROS callbacks to perform without blocking
-            rclpy.spin_once(self, timeout_sec=0)
-
-            # Handle websocket messages asynchronously
-            try:
-                event = await asyncio.wait_for(websocket_recv(), timeout=timeout)
-                if event:
-                    self.handle_pilot_button(json.loads(event))
-            except asyncio.TimeoutError:
-                pass
+            event: PilotButtonEvent = json.loads(await ws_connection.recv())
+            self.handle_pilot_button(event)
 
     def handle_pilot_button(self, event: PilotButtonEvent) -> None:
         """Handle a pilot button event and publish to the corresponding topic.
@@ -228,30 +221,53 @@ class FrankaPilotButtonsNode(Node):
         self.button_event_publisher.publish(button_event_msg)
 
 
+async def spin_async(node: Node) -> None:
+    """Spin a ROS 2 executor asynchronously."""
+    while rclpy.ok():
+        rclpy.spin_once(node, timeout_sec=0)  # Ensure that the spin_once does not block by setting timeout to 0
+        await asyncio.sleep(0)
+
+
+async def start_node_async(node: FrankaPilotButtonsNode) -> None:
+    """Start the node asynchronously."""
+    node.get_logger().info("Starting async loops")
+
+    # Tasks to be run in parallel to prevent the ROS 2 excecutor and websocket loop from blocking each other
+    tasks = [asyncio.create_task(node.start_desk_loop()), asyncio.create_task(spin_async(node))]
+
+    # Start the asyncio tasks until one of them completes (either finishes or raises an exception)
+    done, pending = await asyncio.wait(
+        tasks,
+        return_when=asyncio.FIRST_EXCEPTION,
+    )
+
+    # Check for exceptions and prevent "Task exception was never retrieved"
+    for task in done:
+        if exc := task.exception():
+            raise exc
+
+    # Cancel remaining tasks if one fails, silently discarding the CancelledError
+    for task in pending:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
 def main(args: list[str] | None = None) -> None:
     """Start the node."""
     rclpy.init(args=args)
     node = FrankaPilotButtonsNode()
 
-    # Start asyncio loop and ROS 2 loop in parallel
-    loop = asyncio.get_event_loop()
-    node_task = loop.create_task(node.start_spin())
-
-    # Create a strong reference to the asynchronous task and discard it once it is finished
-    async_tasks = set()
-    async_tasks.add(node_task)
-    node_task.add_done_callback(async_tasks.discard)
-
     try:
-        rclpy.spin(node)
+        asyncio.run(start_node_async(node))
 
     except KeyboardInterrupt:
         pass
 
     finally:
+        # Cleanup
         node.destroy_node()
-        rclpy.shutdown()
-        loop.close()
+        rclpy.try_shutdown()
 
 
 if __name__ == "__main__":
