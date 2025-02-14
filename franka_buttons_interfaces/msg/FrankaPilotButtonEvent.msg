@@ -1,16 +1,17 @@
 # Standard message header
 std_msgs/Header header
 
-# Possible button events
-string PRESSED = "PRESSED"
-string RELEASED = "RELEASED"
-string NO_EVENT = ""
+# Possible buttons for which events are captured
+# Arrow keys. These buttons are not captured when the FCI is used!
+string UP = "up"
+string DOWN = "down"
+string LEFT = "left"
+string RIGHT = "right"
+# Action buttons.
+string CIRCLE = "circle"
+string CROSS = "cross"
+string CHECK = "check"
 
-# Button names. The button event for the pressed button(s) should be set accordingly, or NO_EVENT if the button did not change.
-string circle NO_EVENT
-string cross NO_EVENT
-string check NO_EVENT
-string left NO_EVENT
-string right NO_EVENT
-string up NO_EVENT
-string down NO_EVENT
+# Which of the buttons are pressed or released. If no event occurred for a button, it is not included in either array.
+string[<=7] pressed
+string[<=7] released

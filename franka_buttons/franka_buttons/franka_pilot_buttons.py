@@ -29,6 +29,10 @@ DEFAULT_CREDENTIALS_DIRECTORY = pathlib.Path("~/.ros/franka_buttons/credentials"
 
 
 PilotButtonEvent = dict[str, bool]
+"""Structure of a Pilot Button Event after JSON parsing.
+
+The key is the button name, the value indicates pressed (True) or released (False).
+"""
 
 
 class Desk:
@@ -122,6 +126,17 @@ class Desk:
 class FrankaPilotButtonsNode(Node):
     """Connects to the Franka Desk and exposes the pilot buttons to ROS 2."""
 
+    supported_pilot_buttons: typing.ClassVar = {
+        FrankaPilotButtonEvent.UP,
+        FrankaPilotButtonEvent.DOWN,
+        FrankaPilotButtonEvent.LEFT,
+        FrankaPilotButtonEvent.RIGHT,
+        FrankaPilotButtonEvent.CIRCLE,
+        FrankaPilotButtonEvent.CHECK,
+        FrankaPilotButtonEvent.CROSS,
+    }
+    """Which pilot buttons are currently supported."""
+
     def __init__(self) -> None:
         """Initialize the pilot buttons node."""
         super().__init__("franka_pilot_buttons")
@@ -211,22 +226,18 @@ class FrankaPilotButtonsNode(Node):
         button_event_msg.header.stamp = self.get_clock().now()
 
         for button, pressed in event.items():
-            if button == "down":
-                button_event_msg.down = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
-            elif button == "up":
-                button_event_msg.up = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
-            elif button == "right":
-                button_event_msg.right = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
-            elif button == "left":
-                button_event_msg.left = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
-            elif button == "circle":
-                button_event_msg.circle = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
-            elif button == "cross":
-                button_event_msg.cross = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
-            elif button == "check":
-                button_event_msg.check = FrankaPilotButtonEvent.PRESSED if pressed else FrankaPilotButtonEvent.RELEASED
+            # Check that the button type is supported
+            if button not in self.supported_pilot_buttons:
+                self.get_logger().warning(
+                    f"Unsupported button event received: {button} (was {'pressed' if pressed else 'released'})",
+                )
+                continue  # Do not publish the button event but continue the loop
+
+            # Add the button event to the message
+            if pressed:
+                button_event_msg.pressed.append(button)
             else:
-                self.get_logger().warn(f"Unhandled button event {event=}")
+                button_event_msg.released.append(button)
 
         self.button_event_publisher.publish(button_event_msg)
 
