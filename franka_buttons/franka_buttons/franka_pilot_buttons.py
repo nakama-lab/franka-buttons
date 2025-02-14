@@ -229,7 +229,7 @@ class FrankaPilotButtonsNode(Node):
             # Check that the button type is supported
             if button not in self.supported_pilot_buttons:
                 self.get_logger().warning(
-                    f"Unsupported button event received: {button} (was {'pressed' if pressed else 'released'})",
+                    f"Unsupported button received: {button} (was {'pressed' if pressed else 'released'})",
                 )
                 continue  # Do not publish the button event but continue the loop
 
@@ -246,7 +246,7 @@ async def spin_async(node: Node) -> None:
     """Spin a ROS 2 executor asynchronously."""
     while rclpy.ok():
         rclpy.spin_once(node, timeout_sec=0)  # Ensure that the spin_once does not block by setting timeout to 0
-        await asyncio.sleep(0)
+        await asyncio.sleep(1e-4)  # Sleep for a small while to ensure no busy loop
 
 
 async def start_node_async(node: FrankaPilotButtonsNode) -> None:
