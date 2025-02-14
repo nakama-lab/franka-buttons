@@ -1,6 +1,6 @@
 # Read franka buttons in ROS
 
-This is a ROS repo to read the state of the buttons of franka robot.
+This is a ROS 2 repo to read the state of the Pilot buttons on Franka robot.
 
 - [Read franka buttons in ROS](#read-franka-buttons-in-ros)
   - [Installation](#installation)
