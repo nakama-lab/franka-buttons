@@ -225,6 +225,10 @@ class FrankaPilotButtonsNode(Node):
         button_event_msg = FrankaPilotButtonEvent()
         button_event_msg.header.stamp = self.get_clock().now().to_msg()
 
+        # Explicitly set to list to help the type checker along
+        button_event_msg.pressed = []
+        button_event_msg.released = []
+
         for button, pressed in event.items():
             # Check that the button type is supported
             if button not in self.supported_pilot_buttons:
