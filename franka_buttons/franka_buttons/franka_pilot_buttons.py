@@ -223,7 +223,7 @@ class FrankaPilotButtonsNode(Node):
         """
         self.get_logger().info(f"Received {event=}")
         button_event_msg = FrankaPilotButtonEvent()
-        button_event_msg.header.stamp = self.get_clock().now()
+        button_event_msg.header.stamp = self.get_clock().now().to_msg()
 
         for button, pressed in event.items():
             # Check that the button type is supported
