@@ -2,20 +2,19 @@
 
 This is a ROS 2 repo to read the state of the Pilot buttons on Franka robot.
 
-- [Read franka buttons in ROS](#read-franka-buttons-in-ros)
-  - [Installation](#installation)
-    - [Preparing the virtual environment](#preparing-the-virtual-environment)
-    - [Install Python dependencies](#install-python-dependencies)
-    - [Build the workspace](#build-the-workspace)
-  - [Configuring Franka Desk credentials](#configuring-franka-desk-credentials)
-  - [Running the node](#running-the-node)
-    - [Franka Desk access](#franka-desk-access)
-    - [Node configuration](#node-configuration)
-    - [Button events](#button-events)
-  - [A note about versions](#a-note-about-versions)
-  - [Acknowledgments](#acknowledgments)
-  - [Maintainer](#maintainer)
-  - [License](#license)
+- [Installation](#installation)
+  - [Preparing the virtual environment](#preparing-the-virtual-environment)
+  - [Install Python dependencies](#install-python-dependencies)
+  - [Build the workspace](#build-the-workspace)
+- [Configuring Franka Desk credentials](#configuring-franka-desk-credentials)
+- [Running the node](#running-the-node)
+  - [Franka Desk access](#franka-desk-access)
+  - [Node configuration](#node-configuration)
+  - [Button events](#button-events)
+- [A note about versions](#a-note-about-versions)
+- [Acknowledgments](#acknowledgments)
+- [Maintainer](#maintainer)
+- [License](#license)
 
 ## Installation
 
@@ -73,6 +72,12 @@ source .venv/bin/activate
 python -m colcon build --symlink-install --packages-up-to franka_buttons
 ```
 
+> [!TIP]
+> **How does this work?** 
+> Using `colcon` as installed in the virtual environment will add a shebang to the file `install/franka_buttons/lib/franka_buttons/franka_buttons` like `#!/home/jelle/my_ws/.venv/bin/python`. 
+> This line will ensure that, whenever ROS starts the node, it will use the virtual environment interpreter instead of the global one. 
+> Therefore, it can find the additional dependencies that you installed into the virtual environment.
+
 ## Configuring Franka Desk credentials
 
 To connect to the pilot buttons, we need to connect to the Franka Desk using a username and password. The following steps explain how to configure them:
@@ -93,15 +98,11 @@ nano ~/.ros/franka_buttons/credentials/.env
 
 ## Running the node
 
-Source the built files and run the nodes using the virtual environment. **Order matters! Source the built workspace first, and then the virtual environment.**:
+Source the built files and run the node:
 
 ```bash
 cd ~/<your_ws>
-
-# Source the workspace and virual environment. Order matters!
 source install/setup.bash
-source .venv/bin/activate
-
 ros2 run franka_buttons franka_pilot_buttons --ros-args -p hostname:=<robot-ip>
 ```
 
