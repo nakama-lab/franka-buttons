@@ -183,7 +183,7 @@ If you find this code working or not working with other versions, please open an
 
 This code is heavily inspired by [Giovanni Franzese's `franka_buttons`](https://github.com/franzesegiovanni/franka_buttons) package for ROS 1.
 
-The original `franka_buttons` package was in turn heavily inspired by [Jean Elsner's `panda-py`](https://github.com/franzesegiovanni/franka_buttons) package.
+The original `franka_buttons` package was in turn heavily inspired by [Jean Elsner's `panda-py`](https://github.com/JeanElsner/panda-py) package.
 
 If you end up using this code in published research, please consider citing the [original `panda-py` software paper](https://github.com/JeanElsner/panda-py?tab=readme-ov-file#citation).
 
