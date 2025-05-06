@@ -82,19 +82,21 @@ python -m colcon build --symlink-install --packages-up-to franka_buttons
 
 To connect to the pilot buttons, we need to connect to the Franka Desk using a username and password. The following steps explain how to configure them:
 
-Copy the `.env` template to the `~/.ros/franka_buttons/credentials` directory. `franka_pilot_buttons` expects them here by default. You can also choose another location, but you have to [define the `credentials_filepath` parameter](#node-configuration).
+Copy the `.env` template to the `~/.ros/franka_buttons/credentials` directory and add the credentials to it. `franka_pilot_buttons` expects them here by default. You can also choose another location, but you have to [define the `credentials_filepath` parameter](#node-configuration).
 
 ```bash
 cd ~/<your_ws>/src/franka_buttons_ros2
 mkdir -p ~/.ros/franka_buttons/credentials
 cp -i .env.template ~/.ros/franka_buttons/credentials/.env
-```
-
-Add your credentials to the copied file:
-
-```bash
 nano ~/.ros/franka_buttons/credentials/.env
 ```
+
+> [!WARNING]
+> This will store your Franka Desk credentials in plain text on your PC.
+> Make sure that you can trust the other users of the PC.
+> 
+> There is currently no alternative to this currently.
+> [This issue](https://github.com/jellehierck/franka_buttons_ros2/issues/2) will try to implement a safer method.
 
 ## Running the node
 
