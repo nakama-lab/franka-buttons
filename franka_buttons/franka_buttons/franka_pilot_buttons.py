@@ -15,12 +15,14 @@ import typing
 from urllib import parse
 
 import rclpy
+import rclpy.qos
 import requests
 import urllib3
 from dotenv import load_dotenv
 from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 from websockets.asyncio.client import connect
+from websockets.exceptions import ConnectionClosedOK
 
 from franka_buttons_interfaces.msg import FrankaPilotButtonEvent
 
@@ -141,8 +143,21 @@ class FrankaPilotButtonsNode(Node):
         """Initialize the pilot buttons node."""
         super().__init__("franka_pilot_buttons")
 
-        # Declare all parameters
-        hostname_param = self.declare_parameter(
+        # Declare all ROS connections
+        self.declare_all_parameters()
+        self.declare_all_publishers()
+
+        # Set up the Franka Desk
+        self.desk = Desk(self.hostname_param.get_parameter_value().string_value)
+
+        # Indicate the node has started
+        self.get_logger().info("Started, waiting on Franka button input.")
+
+    # --------------- ROS connections ---------------
+
+    def declare_all_parameters(self) -> None:
+        """Declare all parameters for the node."""
+        self.hostname_param = self.declare_parameter(
             "hostname",
             "",
             ParameterDescriptor(
@@ -151,12 +166,12 @@ class FrankaPilotButtonsNode(Node):
             ),
         )
         # Validate that the parameter was set
-        if hostname_param.get_parameter_value().string_value == "":
+        if self.hostname_param.get_parameter_value().string_value == "":
             self.get_logger().error("The 'hostname' parameter is required but was not provided!")
             msg = "Missing required parameter: 'hostname'"
             raise RuntimeError(msg)
 
-        self.declare_parameter(
+        self.credentials_filepath_param = self.declare_parameter(
             "credentials_filepath",
             str(DEFAULT_CREDENTIALS_DIRECTORY / ".env"),
             ParameterDescriptor(
@@ -165,7 +180,7 @@ class FrankaPilotButtonsNode(Node):
             ),
         )
 
-        self.declare_parameter(
+        self.request_timeout_param = self.declare_parameter(
             "request_timeout",
             2.0,
             ParameterDescriptor(
@@ -173,41 +188,15 @@ class FrankaPilotButtonsNode(Node):
             ),
         )
 
-        # Create publishers
-        self.button_event_publisher = self.create_publisher(FrankaPilotButtonEvent, "franka_pilot_button_event", 10)
-
-        # Set up the Franka Desk.
-        self.desk = Desk(hostname_param.get_parameter_value().string_value)
-
-    async def start_desk_loop(self) -> None:
-        """Start the loop which obtains messages from the Desk websocket and publishes to ROS 2.
-
-        This function will loop forever, so it is designed to run with `asyncio` alongside a `rclpy.spin*()` variant.
-        """
-        # Connect to the desk and log in
-        credentials_filepath = self.get_parameter("credentials_filepath").get_parameter_value().string_value
-        load_dotenv(credentials_filepath)
-
-        self.get_logger().info(f"Logging in to Franka Desk using credentials in '{credentials_filepath}'.")
-        self.desk.login(
-            username=os.environ["FRANKA_DESK_USERNAME"],
-            password=os.environ["FRANKA_DESK_PASSWORD"],
-            timeout=self.get_parameter("request_timeout").get_parameter_value().double_value,
+    def declare_all_publishers(self) -> None:
+        """Declare all publishers for this node."""
+        self.button_event_publisher = self.create_publisher(
+            FrankaPilotButtonEvent,
+            "franka_pilot_button_event",
+            rclpy.qos.qos_profile_system_default,
         )
-        self.get_logger().info("Franka Desk login succesful.")
 
-        # Obtain the websocket connection
-        ws_connection = self.desk.create_websocket_connection(
-            timeout=self.get_parameter("request_timeout").get_parameter_value().double_value,
-        )
-        self.get_logger().info("Websocket to Desk opened.")
-
-        async with ws_connection as websocket:
-            while rclpy.ok():
-                # TODO: Possibly handle websockets.exceptions.ConnectionClosedOK here?
-                # See https://github.com/jellehierck/franka_buttons_ros2/issues/1
-                event: PilotButtonEvent = json.loads(await websocket.recv())
-                self.handle_pilot_button(event)
+    # --------------- ROS callbacks ---------------
 
     def handle_pilot_button(self, event: PilotButtonEvent) -> None:
         """Handle a pilot button event and publish to the corresponding topic.
@@ -245,6 +234,47 @@ class FrankaPilotButtonsNode(Node):
 
         self.button_event_publisher.publish(button_event_msg)
 
+    # --------------- Async loop ---------------
+
+    async def start_desk_loop(self) -> None:
+        """Start the loop which obtains messages from the Desk websocket and publishes to ROS 2.
+
+        This function will loop forever, so it is designed to run with `asyncio` alongside a `rclpy.spin*()` variant.
+        """
+        # Check if the credentials can be loaded from the environment variable file
+        credentials_filepath = (
+            self.get_parameter(self.credentials_filepath_param.name).get_parameter_value().string_value
+        )
+        self.get_logger().info(f"Logging in to Franka Desk using credentials in '{credentials_filepath}'.")
+        if not load_dotenv(credentials_filepath):
+            msg = f"Could not load credentials from {credentials_filepath}"
+            raise ValueError(msg)
+
+        # Connect to the desk and log in
+        self.desk.login(
+            username=os.environ["FRANKA_DESK_USERNAME"],
+            password=os.environ["FRANKA_DESK_PASSWORD"],
+            timeout=self.get_parameter(self.request_timeout_param.name).get_parameter_value().double_value,
+        )
+        self.get_logger().info("Franka Desk login succesful.")
+
+        # Obtain the websocket connection
+        ws_connection = self.desk.create_websocket_connection(
+            timeout=self.get_parameter(self.request_timeout_param.name).get_parameter_value().double_value,
+        )
+        self.get_logger().info("Websocket to Desk opened.")
+
+        async with ws_connection as websocket:
+            try:
+                while rclpy.ok():
+                    event: PilotButtonEvent = json.loads(await websocket.recv())
+                    self.handle_pilot_button(event)
+            except ConnectionClosedOK as exc:
+                self.get_logger().warning("Connection to Franka Desk is closed! Is control taken away?")
+                self.get_logger().warning(f"Connection information: {exc}")
+                self.get_logger().warning("This node will now exit.")
+                return
+
 
 async def spin_async(node: Node) -> None:
     """Spin a ROS 2 executor asynchronously."""
@@ -258,7 +288,10 @@ async def start_node_async(node: FrankaPilotButtonsNode) -> None:
     node.get_logger().info("Starting async loops")
 
     # Tasks to be run in parallel to prevent the ROS 2 excecutor and websocket loop from blocking each other
-    tasks = [asyncio.create_task(node.start_desk_loop()), asyncio.create_task(spin_async(node))]
+    tasks = [
+        asyncio.create_task(node.start_desk_loop()),
+        asyncio.create_task(spin_async(node)),
+    ]
 
     # Start the asyncio tasks until one of them completes (either finishes or raises an exception)
     done, pending = await asyncio.wait(
