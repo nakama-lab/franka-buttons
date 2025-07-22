@@ -245,12 +245,29 @@ class FrankaPilotButtonsNode(Node):
         credentials_filepath = (
             self.get_parameter(self.credentials_filepath_param.name).get_parameter_value().string_value
         )
-        self.get_logger().info(f"Logging in to Franka Desk using credentials in '{credentials_filepath}'.")
-        if not load_dotenv(credentials_filepath):
-            msg = f"Could not load credentials from {credentials_filepath}"
+
+        # If the credentials filepath exists, load the credentials from that file into memory
+        if pathlib.Path(credentials_filepath).exists():
+            self.get_logger().info(f"Logging in to Franka Desk using credentials in '{credentials_filepath}'.")
+            if not load_dotenv(credentials_filepath):
+                msg = f"Could not load credentials from {credentials_filepath}"
+                self.get_logger().error(msg)
+                raise ValueError(msg)
+        else:
+            # If the credentials filepath does not exist, try to load credentials form the environment variables instead
+            self.get_logger().warning(
+                f"Cannot load credentials path '{credentials_filepath}'."
+                "The Franka Desk credentials will be loaded from environment variables instead.",
+            )
+
+        # The credentials should now be in the environment variables, check if that is indeed the case
+        if not os.environ.get("FRANKA_DESK_USERNAME") or not os.environ.get("FRANKA_DESK_PASSWORD") :
+            msg = "Could not load both environment variables 'FRANKA_DESK_USERNAME' and 'FRANKA_DESK_PASSWORD'"
+            self.get_logger().error(msg)
             raise ValueError(msg)
 
         # Connect to the desk and log in
+        self.get_logger().error("Logging in to Franka Desk...")
         self.desk.login(
             username=os.environ["FRANKA_DESK_USERNAME"],
             password=os.environ["FRANKA_DESK_PASSWORD"],

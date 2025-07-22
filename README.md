@@ -3,15 +3,17 @@
 Read the Pilot Buttons on a Franka robot arm.
 
 - [Quickstart](#quickstart)
-- [Installation](#installation)
+  - [Install and run using Docker (recommended)](#install-and-run-using-docker-recommended)
+  - [Install and run locally (without Docker)](#install-and-run-locally-without-docker)
+- [Button events](#button-events)
+- [Franka Desk access](#franka-desk-access)
+- [Installing locally (without Docker)](#installing-locally-without-docker)
   - [Preparing the virtual environment](#preparing-the-virtual-environment)
   - [Install Python dependencies](#install-python-dependencies)
   - [Build the workspace](#build-the-workspace)
-- [Configuring Franka Desk credentials](#configuring-franka-desk-credentials)
+  - [Configuring Franka Desk credentials](#configuring-franka-desk-credentials)
 - [Running the node](#running-the-node)
-  - [Franka Desk access](#franka-desk-access)
   - [Node configuration](#node-configuration)
-  - [Button events](#button-events)
 - [A note about versions](#a-note-about-versions)
 - [Acknowledgments](#acknowledgments)
 - [Maintainer](#maintainer)
@@ -20,6 +22,27 @@ Read the Pilot Buttons on a Franka robot arm.
 ## Quickstart
 
 Use the following steps to get up and running quickly.
+
+### Install and run using Docker (recommended)
+
+Setting up the Franka Buttons with Docker is the easiest.
+
+1. Set up the Franka Desk credentials using Nano (assuming you are in the folder containing this README):
+
+```bash
+cp -i .env.template .env
+nano .env
+```
+
+2. Build and start the Docker container:
+
+```bash
+docker compose up
+```
+
+### Install and run locally (without Docker)
+
+Follow these steps if you do not want to use Docker. For the full installation instructions and additional information, see [Installing locally (without Docker)](#installing-locally-without-docker).
 
 1. Clone, install dependencies, and build the node (assuming you are in a ROS 2 workspace folder):
 
@@ -53,7 +76,34 @@ source install/setup.bash
 ros2 run franka_buttons franka_pilot_buttons --ros-args -p hostname:=<robot-ip>
 ```
 
-## Installation
+## Button events
+
+When a button is pressed, it is captured by `franka_pilot_buttons` and a `franka_buttons_interfaces/msg/FrankaPilotButtonEvent` message is published with that button's field set to `"PRESSED"`. When the button is held, the message is re-sent a few times per second. When the button is released, a final message is sent with that button's field set to `"RELEASED"`. If multiple buttons are pressed or released simultaneously, they are combined within a single `FrankaPilotButtonEvent` message. If no buttons are pressed, no messages are published.
+
+There are eight buttons on the Franka Research 3 robot:
+
+- Arrow keys (important: these buttons are *not captured* when FCI is enabled):
+  - `up`
+  - `down`
+  - `left`
+  - `right`
+- Action buttons:
+  - `cross` (also called Delete)
+  - `check` (also called Confirm)
+  - `circle` (also called Teach)
+- And finally the `pilot` button, which is not captured by `franka_pilot_buttons`
+
+![Franka Pilot Buttons](./doc/franka-buttons.png)
+
+## Franka Desk access
+
+Once the `franka_pilot_buttons` node logs in to the Desk, it will automatically take control of the robot and cause the Desk dashboard in the browser to disconnect as shown below.
+
+Note: When the browser dashboard reconnects to the robot (e.g. by pressing the `Reconnect` button or refreshing the page), the `franka_pilot_buttons` node will shut down.
+
+![Franka Desk dashboard disconnect](./doc/franka-desk-disconnect.png)
+
+## Installing locally (without Docker)
 
 Clone this repository to your ROS 2 workspace's `src/` folder.
 
@@ -88,15 +138,7 @@ Install Python dependencies in the virtual environment using one of the followin
 ```bash
 cd ~/<your_ws>
 source .venv/bin/activate
-
-# From a specific requirements.txt file
 pip3 install -r src/franka-buttons/franka_buttons/requirements.txt
-
-# OR install packages directly
-pip3 install package1 package2
-
-# OR traverse the workspace source folder to find all requirements files (source: https://stackoverflow.com/a/67062234)
-find ./src -name "requirement*.txt" -type f -exec pip3 install -r '{}' ';'
 ```
 
 ### Build the workspace
@@ -110,12 +152,12 @@ python -m colcon build --symlink-install --packages-up-to franka_buttons
 ```
 
 > [!TIP]
-> **How does this work?** 
-> Using `colcon` as installed in the virtual environment will add a shebang to the file `install/franka_buttons/lib/franka_buttons/franka_buttons` like `#!/home/jelle/my_ws/.venv/bin/python`. 
-> This line will ensure that, whenever ROS starts the node, it will use the virtual environment interpreter instead of the global one. 
+> **How does this work?**
+> Using `colcon` as installed in the virtual environment will add a shebang to the file `install/franka_buttons/lib/franka_buttons/franka_buttons` like `#!/home/jelle/my_ws/.venv/bin/python`.
+> This line will ensure that, whenever ROS starts the node, it will use the virtual environment interpreter instead of the global one.
 > Therefore, it can find the additional dependencies that you installed into the virtual environment.
 
-## Configuring Franka Desk credentials
+### Configuring Franka Desk credentials
 
 To connect to the pilot buttons, we need to connect to the Franka Desk using a username and password. The following steps explain how to configure them:
 
@@ -131,7 +173,7 @@ nano ~/.ros/franka_buttons/credentials/.env
 > [!WARNING]
 > This will store your Franka Desk credentials in plain text on your PC.
 > Make sure that you can trust the other users of the PC.
-> 
+>
 > There is currently no alternative to this currently.
 > [This issue](https://github.com/nakama-lab/franka-buttons/issues/2) will try to implement a safer method.
 
@@ -173,14 +215,6 @@ def generate_launch_description() -> LaunchDescription:
     ])
 ```
 
-### Franka Desk access
-
-Once the `franka_pilot_buttons` node logs in to the Desk, it will automatically take control of the robot and cause the Desk dashboard in the browser to disconnect as shown below.
-
-Note: When the browser dashboard reconnects to the robot (e.g. by pressing the `Reconnect` button or refreshing the page), the `franka_pilot_buttons` node will shut down.
-
-![Franka Desk dashboard disconnect](./doc/franka-desk-disconnect.png)
-
 ### Node configuration
 
 The `franka_pilot_buttons` has some important parameters:
@@ -188,25 +222,6 @@ The `franka_pilot_buttons` has some important parameters:
 - `hostname`: (string, required) The hostname of the Franka Control Box to connect to the Franka Desk.
 - `credentials_filepath`: (string) Where to find the Franka Desk login credentials. Defaults to `~/.ros/franka_buttons/credentials/.env`. Make sure to [configure the credentials](#configuring-franka-desk-credentials).
 - `request_timeout`: (float) Timeout for Franka Desk requests in seconds. Defaults to `2.0`.
-
-### Button events
-
-When a button is pressed, it is captured by `franka_pilot_buttons` and a `franka_buttons_interfaces/msg/FrankaPilotButtonEvent` message is published with that button's field set to `"PRESSED"`. When the button is held, the message is re-sent a few times per second. When the button is released, a final message is sent with that button's field set to `"RELEASED"`. If multiple buttons are pressed or released simultaneously, they are combined within a single `FrankaPilotButtonEvent` message. If no buttons are pressed, no messages are published.
-
-There are eight buttons on the Franka Research 3 robot:
-
-- Arrow keys (important: these buttons are *not captured* when FCI is enabled):
-  - `up`
-  - `down`
-  - `left`
-  - `right`
-- Action buttons:
-  - `cross` (also called Delete)
-  - `check` (also called Confirm)
-  - `circle` (also called Teach)
-- And finally the `pilot` button, which is not captured by `franka_pilot_buttons`
-
-![Franka Pilot Buttons](./doc/franka-buttons.png)
 
 ## A note about versions
 

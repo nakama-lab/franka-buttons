@@ -1,0 +1,21 @@
+services:
+
+  franka_buttons:
+    image: franka_buttons
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+
+    container_name: franka_buttons
+
+    network_mode: "host"
+
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-55}
+
+    env_file:
+      # Important: you need to create the .env file using the Franka Desk credentials, see the README for more information
+      - .env
+
+    command: ros2 run franka_buttons franka_pilot_buttons --ros-args -p hostname:=$ROBOT_HOSTNAME
+
