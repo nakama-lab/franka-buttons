@@ -1,7 +1,8 @@
 # Read franka buttons in ROS
 
-This is a ROS 2 repo to read the state of the Pilot buttons on Franka robot.
+Read the Pilot Buttons on a Franka robot arm.
 
+- [Quickstart](#quickstart)
 - [Installation](#installation)
   - [Preparing the virtual environment](#preparing-the-virtual-environment)
   - [Install Python dependencies](#install-python-dependencies)
@@ -16,13 +17,49 @@ This is a ROS 2 repo to read the state of the Pilot buttons on Franka robot.
 - [Maintainer](#maintainer)
 - [License](#license)
 
+## Quickstart
+
+Use the following steps to get up and running quickly.
+
+1. Clone, install dependencies, and build the node (assuming you are in a ROS 2 workspace folder):
+
+```bash
+# Create virtual environment (required for building the node)
+sudo apt install python3-venv
+source /opt/ros/humble/setup.bash
+python3 -m venv .venv --system-site-packages --symlinks
+touch .venv/COLCON_IGNORE
+
+# Clone package, install dependencies, build
+git clone https://github.com/nakama-lab/franka-buttons ./src/
+source .venv/bin/activate
+pip3 install -r src/franka-buttons/franka_buttons/requirements.txt
+rosdep install --from-paths src -y --ignore-src
+python -m colcon build --symlink-install --packages-up-to franka_buttons
+```
+
+2. Set up the Franka Desk credentials using Nano:
+
+```bash
+mkdir -p ~/.ros/franka_buttons/credentials
+cp -i ./src/franka-buttons/.env.template ~/.ros/franka_buttons/credentials/.env
+nano ~/.ros/franka_buttons/credentials/.env
+```
+
+3. Run the node to publish button states:
+
+```bash
+source install/setup.bash
+ros2 run franka_buttons franka_pilot_buttons --ros-args -p hostname:=<robot-ip>
+```
+
 ## Installation
 
 Clone this repository to your ROS 2 workspace's `src/` folder.
 
 ```bash
 cd ~/<your_ws>/src
-git clone https://github.com/jellehierck/franka_buttons_ros2
+git clone https://github.com/nakama-lab/franka-buttons
 ```
 
 ### Preparing the virtual environment
@@ -53,7 +90,7 @@ cd ~/<your_ws>
 source .venv/bin/activate
 
 # From a specific requirements.txt file
-pip3 install -r src/franka_buttons_ros2/franka_buttons/requirements.txt
+pip3 install -r src/franka-buttons/franka_buttons/requirements.txt
 
 # OR install packages directly
 pip3 install package1 package2
@@ -85,7 +122,7 @@ To connect to the pilot buttons, we need to connect to the Franka Desk using a u
 Copy the `.env` template to the `~/.ros/franka_buttons/credentials` directory and add the credentials to it. `franka_pilot_buttons` expects them here by default. You can also choose another location, but you have to [define the `credentials_filepath` parameter](#node-configuration).
 
 ```bash
-cd ~/<your_ws>/src/franka_buttons_ros2
+cd ~/<your_ws>/src/franka-buttons
 mkdir -p ~/.ros/franka_buttons/credentials
 cp -i .env.template ~/.ros/franka_buttons/credentials/.env
 nano ~/.ros/franka_buttons/credentials/.env
@@ -96,7 +133,7 @@ nano ~/.ros/franka_buttons/credentials/.env
 > Make sure that you can trust the other users of the PC.
 > 
 > There is currently no alternative to this currently.
-> [This issue](https://github.com/jellehierck/franka_buttons_ros2/issues/2) will try to implement a safer method.
+> [This issue](https://github.com/nakama-lab/franka-buttons/issues/2) will try to implement a safer method.
 
 ## Running the node
 
